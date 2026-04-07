@@ -1,10 +1,10 @@
 # Stage 1: Build the Vite React Frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:18-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
 # Install dependencies strictly (utilizing cache)
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY frontend/package.json ./
 RUN npm install
 
 # Build the static Vite bundle
