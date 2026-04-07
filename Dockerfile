@@ -14,7 +14,7 @@ COPY frontend/src/ ./
 
 # 3. 빌드 실행
 # 여기서 에러가 난다면 로컬에서 'npm run build'가 성공하는지 확인이 필요합니다.
-RUN npm run build
+RUN CI=falsenpm run build
 
 
 # Stage 2: Backend & Final Image
