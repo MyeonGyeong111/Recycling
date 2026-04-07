@@ -1,15 +1,14 @@
 # Stage 1: Build the Vite React Frontend
-FROM node:18-slim AS frontend-builder
-
+FROM node:18-bullseye AS frontend-builder
 WORKDIR /app/frontend
 
-# Install dependencies strictly (utilizing cache)
-COPY frontend/package.json ./
-RUN npm install
-
-# Build the static Vite bundle
+# Copy all source files cleanly
 COPY frontend/ ./
-RUN npm run build
+
+# Force a completely clean layout, bypassing any locked host-environment issues
+RUN rm -rf node_modules package-lock.json && \
+    npm install && \
+    npm run build
 
 
 # Stage 2: Build the FastAPI Backend & Serve Frontend
