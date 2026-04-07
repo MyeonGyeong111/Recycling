@@ -9,6 +9,7 @@ on:
       - main
 
 jobs:
+  # 1. 빌드 단계: GitHub 서버(ubuntu-latest)에서 실행
   build-and-push:
     name: Build & Push to Docker Hub
     runs-on: ubuntu-latest
@@ -21,7 +22,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        # Pull request builds don't get pushed; only push events trigger deployment
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
@@ -34,15 +34,16 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest
-          # Caching configuration to speed up multi-stage builds
+          # 빌드 속도를 높이기 위한 캐시 설정
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache,mode=max
 
+  # 2. 배포 단계: 사용자님의 노트북(self-hosted)에서 실행
   deploy:
     name: Deploy to Self-Hosted Runner
     needs: build-and-push
     if: github.event_name != 'pull_request'
-    # Self-hosted runner (로컬 컴퓨터)에서 실행되도록 지정
+    # 'self-hosted' 라벨이 붙은 노트북 러너에서 실행됩니다.
     runs-on: self-hosted
 
     steps:
@@ -53,21 +54,19 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull & Run New Container
+        # 윈도우 환경이므로 모든 sudo를 제거했습니다.
         run: |
-          IMAGE_TAG="${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest"
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest
           
-          # 1. Docker Hub에서 최신 이미지 받기
-          sudo docker pull $IMAGE_TAG
+          # 기존 컨테이너가 있으면 지우고, 없어도 에러 없이 진행하도록 설정
+          docker rm -f recycling_api-api-1 || echo "No existing container to remove"
           
-          # 2. 기존 실행 중인 컨테이너 삭제 (강제 종료)
-          sudo docker rm -f recycling_api-api-1 || true
-          
-          # 3. 새로운 컨테이너 백그라운드 실행
-          sudo docker run -d \
+          # 새로운 컨테이너 실행
+          docker run -d \
             --name recycling_api-api-1 \
             -p 8000:8000 \
             --restart unless-stopped \
-            $IMAGE_TAG
+            ${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest
             
-          # 4. 안 쓰는 찌꺼기 이미지 메모리 정리
-          sudo docker image prune -f
+          # 사용하지 않는 오래된 이미지 정리
+          docker image prune -f
