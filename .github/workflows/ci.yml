@@ -9,72 +9,56 @@ on:
       - main
 
 jobs:
-  # 1. 빌드 및 푸시 단계 (GitHub 제공 리눅스 서버에서 실행)
   build-and-push:
     name: Build & Push to Docker Hub
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache,mode=max
 
-  # 2. 배포 단계 (사용자님의 윈도우 노트북 Self-hosted Runner에서 실행)
   deploy:
     name: Deploy to Self-Hosted Runner
     needs: build-and-push
     if: github.event_name != 'pull_request'
     runs-on: self-hosted
-
     steps:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Pull & Run New Container
-        # 윈도우 PowerShell 문법을 사용하도록 명시
+        # 윈도우 전용 쉘 설정
         shell: pwsh
         run: |
           $IMAGE_NAME = "${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest"
-          
-          Write-Host "Starting to pull image: $IMAGE_NAME"
           docker pull $IMAGE_NAME
           
-          # 기존 컨테이너 존재 여부 확인 후 삭제
+          # 컨테이너 존재 확인 후 삭제 (PowerShell 문법)
           $container = docker ps -a -q --filter "name=recycling_api-api-1"
           if ($container) {
-              Write-Host "Removing existing container..."
               docker rm -f recycling_api-api-1
           }
 
-          # 새 컨테이너 실행 (윈도우 PowerShell 줄바꿈 기호 ` 사용)
-          Write-Host "Running new container..."
+          # 백틱(`) 기호를 사용한 줄바꿈
           docker run -d `
             --name recycling_api-api-1 `
             -p 8000:8000 `
             --restart unless-stopped `
             $IMAGE_NAME
             
-          # 사용하지 않는 이미지 정리
           docker image prune -f
-          Write-Host "Deployment completed successfully!"
