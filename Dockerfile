@@ -1,44 +1,39 @@
-# Stage 1: Frontend Build (Vite/React)
+# Stage 1: Frontend Build
 FROM node:18-bullseye AS frontend-builder
 
-# package.json이 있는 실제 위치로 이동
+# 핵심: 워킹 디렉토리를 아예 package.json이 있는 곳으로 잡습니다.
 WORKDIR /app/frontend/src
 
-# 1. 의존성 파일만 먼저 복사 (캐시 활용)
-# 현재 구조상 frontend/src 폴더 안에 package.json이 있으므로 해당 경로 지정
+# 1. 의존성 설치 (캐시 활용)
 COPY frontend/src/package*.json ./
-
-# 2. 라이브러리 설치
 RUN npm install
 
-# 3. 프론트엔드 전체 소스 복사
+# 2. 모든 소스 복사 (index.html, vite.config.js 등 포함)
+# 현재 위치가 /app/frontend/src 이므로, 로컬의 frontend/src 내용을 여기에 붓습니다.
 COPY frontend/src/ ./
 
-# 4. 빌드 실행 (결과물은 보통 ./dist 폴더에 생성됨)
+# 3. 빌드 실행
+# 여기서 에러가 난다면 로컬에서 'npm run build'가 성공하는지 확인이 필요합니다.
 RUN npm run build
 
 
-# Stage 2: Backend Build (FastAPI)
+# Stage 2: Backend & Final Image
 FROM python:3.10-slim AS backend
-
 WORKDIR /app
 
-# 시스템 의존성 설치 (curl 등)
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# 5. 파이썬 라이브러리 설치
+# 파이썬 설정
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. 백엔드 소스 코드 복사
+# 백엔드 코드 복사
 COPY app/ ./app/
 
-# 7. Stage 1에서 빌드된 결과물을 백엔드 정적 파일 경로로 복사
-# frontend/src/dist 폴더가 생성되었는지 확인 후 복사합니다.
+# 4. 프론트엔드 빌드 결과물 복사
+# 중요: Vite 빌드 결과물이 /app/frontend/src/dist 에 생기는지 확인하세요.
 COPY --from=frontend-builder /app/frontend/src/dist/ ./frontend/dist/
 
-# 포트 개방
 EXPOSE 8000
 
-# 8. 서버 실행 (app.main:app 경로가 맞는지 확인하세요!)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
