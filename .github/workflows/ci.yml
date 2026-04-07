@@ -37,3 +37,37 @@ jobs:
           # Caching configuration to speed up multi-stage builds
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:buildcache,mode=max
+
+  deploy:
+    name: Deploy to Self-Hosted Runner
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    # Self-hosted runner (로컬 컴퓨터)에서 실행되도록 지정
+    runs-on: self-hosted
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull & Run New Container
+        run: |
+          IMAGE_TAG="${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest"
+          
+          # 1. Docker Hub에서 최신 이미지 받기
+          sudo docker pull $IMAGE_TAG
+          
+          # 2. 기존 실행 중인 컨테이너 삭제 (강제 종료)
+          sudo docker rm -f recycling_api-api-1 || true
+          
+          # 3. 새로운 컨테이너 백그라운드 실행
+          sudo docker run -d \
+            --name recycling_api-api-1 \
+            -p 8000:8000 \
+            --restart unless-stopped \
+            $IMAGE_TAG
+            
+          # 4. 안 쓰는 찌꺼기 이미지 메모리 정리
+          sudo docker image prune -f
