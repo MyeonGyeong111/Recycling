@@ -1,0 +1,20 @@
+# Frontend
+frontend/node_modules
+frontend/dist
+.env
+
+# Backend Python
+__pycache__
+*.pyc
+*.pyo
+venv/
+env/
+.pytest_cache/
+
+# Git
+.git
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
