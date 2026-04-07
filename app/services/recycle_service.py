@@ -1,14 +1,52 @@
-# Mock ML Service 
+import io
+from PIL import Image
+from transformers import pipeline
+
+# Load ML model in global scope so it only loads once
+print("Loading HuggingFace ML Model (this may take a moment)...")
+try:
+    # yangy50/garbage-classification is a lightweight classification model for trash
+    classifier = pipeline("image-classification", model="yangy50/garbage-classification")
+except Exception as e:
+    print(f"Failed to load model: {e}")
+    classifier = None
+
 class RecycleService:
     @staticmethod
     async def predict_image(image_bytes: bytes) -> dict:
-        # TODO: Integrate Hugging Face Vision Transformer model here
-        # Mocking for now
-        return {
-            "category": "PLASTIC",
-            "confidence": 0.95,
-            "message": "This looks like a plastic bottle."
-        }
+        if classifier is None:
+            return {"category": "ERROR", "confidence": 0.0, "message": "ML 모델을 불러오는 데 실패했습니다."}
+            
+        try:
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            
+            # Hugging Face model prediction
+            predictions = classifier(image)
+            top_pred = predictions[0] # List sorted by highest score
+            
+            label_lower = top_pred["label"].lower()
+            confidence = float(top_pred["score"])
+            
+            # Map predictions to internal API categories
+            category = "GENERAL"
+            if "plastic" in label_lower:
+                category = "PLASTIC"
+            elif "glass" in label_lower:
+                category = "GLASS"
+            elif "paper" in label_lower or "cardboard" in label_lower:
+                category = "PAPER"
+            elif "metal" in label_lower or "can" in label_lower:
+                category = "CAN"
+            
+            accuracy = f"{int(confidence * 100)}%"
+            msg = f"AI가 쓰레기를 '{top_pred['label']}'(으)로 인식했습니다! (확신도 {accuracy})"
+            return {
+                "category": category,
+                "confidence": confidence,
+                "message": msg
+            }
+        except Exception as e:
+            return {"category": "ERROR", "confidence": 0.0, "message": f"인식 중 오류 발생: {str(e)}"}
         
     @staticmethod
     def get_category_info(category: str) -> dict:
