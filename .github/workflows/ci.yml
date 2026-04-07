@@ -43,7 +43,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Pull & Run New Container
         # 윈도우 전용 쉘 설정
-        shell: pwsh
+        shell: powershell
         run: |
           $IMAGE_NAME = "${{ secrets.DOCKERHUB_USERNAME }}/recycling-api:latest"
           docker pull $IMAGE_NAME
